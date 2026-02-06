@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Footfall Peak Report</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        h2 {
+            margin-bottom: 15px;
+        }
+
+        form {
+            max-width: 520px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: #f9f9f9;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .form-row label {
+            width: 160px;
+            font-weight: bold;
+        }
+
+        .form-row input {
+            flex: 1;
+            padding: 6px;
+        }
+
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 70%;
+            margin-top: 25px;
+        }
+
+        th,
+        td {
+            border: 1px solid #202020;
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #000000;
+            color: #ffffff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Footfall Peak Report</h2>
+
+    <form>
+        <div class="form-row">
+            <label for="deviceId">Device ID</label>
+            <input type="text" id="deviceId" placeholder="Enter Device ID">
+        </div>
+
+        <div class="form-row">
+            <label for="imei">IMEI</label>
+            <input type="text" id="imei" placeholder="Enter IMEI">
+        </div>
+
+        <div class="form-row">
+            <label for="fromDate">From Date</label>
+            <input type="date" id="fromDate">
+        </div>
+
+        <div class="form-row">
+            <label for="toDate">To Date</label>
+            <input type="date" id="toDate">
+        </div>
+
+        <div class="form-row">
+            <label for="sessionCookie">Session</label>
+            <input type="text" id="sessionCookie" placeholder="APP_SESSION value only">
+        </div>
+
+        <button type="button" id="getReport">Get Report</button>
+    </form>
+
+    <table id="reportTable" style="display:none;">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Peak Hour</th>
+                <th>Footfalls</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        document.getElementById('getReport').addEventListener('click', async () => {
+            const deviceId = document.getElementById('deviceId').value.trim();
+            const imei = document.getElementById('imei').value.trim();
+            const fromDate = document.getElementById('fromDate').value;
+            const toDate = document.getElementById('toDate').value;
+            const sessionValue = document.getElementById('sessionCookie').value.trim();
+
+            if (!deviceId || !imei || !fromDate || !toDate || !sessionValue) {
+                alert('Please fill all fields.');
+                return;
+            }
+
+            const tableBody = document.querySelector('#reportTable tbody');
+            tableBody.innerHTML = '';
+            document.getElementById('reportTable').style.display = '';
+
+            let currentDate = new Date(fromDate);
+            const endDate = new Date(toDate);
+
+            while (currentDate <= endDate) {
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const isoDate = dateStr + 'T00:00:00.000+05:30';
+
+                const row = tableBody.insertRow();
+                row.insertCell(0).textContent = dateStr;
+
+                try {
+                    const response = await fetch('http://localhost:3000/fetch-footfalls', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            deviceId,
+                            imei,
+                            date: isoDate,
+                            sessionValue
+                        })
+                    });
+
+                    const result = await response.json();
+                    console.log(`Date ${dateStr} → Status ${result.status}`);
+
+                    if (result.status === 200 && result.data?.stat?.footfalls) {
+                        const footfalls = result.data.stat.footfalls;
+                        const peakValue = Math.max(...footfalls);
+                        const peakHour = footfalls.indexOf(peakValue);
+
+                        row.insertCell(1).textContent = peakHour + ':00';
+                        row.insertCell(2).textContent = peakValue;
+                    } else {
+                        row.insertCell(1).textContent = 'No Data';
+                        row.insertCell(2).textContent = 'No Data';
+                    }
+                } catch (err) {
+                    console.error(`Error for ${dateStr}:`, err);
+                    row.insertCell(1).textContent = 'Error';
+                    row.insertCell(2).textContent = 'Error';
+                }
+
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+        });
+    </script>
+
+
+</body>
+
+</html>
